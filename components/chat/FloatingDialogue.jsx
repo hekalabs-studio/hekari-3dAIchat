@@ -24,7 +24,7 @@ function getMessageText(msg) {
 
 export default function FloatingDialogue({
   message,
-  companionName = "Ren",
+  companionName = "Akari",
   isSpeaking = false,
   onReplayVoice,
   onOpenChatDrawer,

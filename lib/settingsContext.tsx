@@ -108,18 +108,10 @@ export interface AvatarPreset {
   url: string;
   defaultVoiceGender: "female" | "male";
   thumb: string;
+  image?: string;
 }
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
-  {
-    id: "ren",
-    name: "Ren",
-    desc: "Karakter anime kasual santai dengan t-shirt (ekspresif & ramah)",
-    gender: "female",
-    url: "/models/avatar2.glb",
-    defaultVoiceGender: "female",
-    thumb: "👧",
-  },
   {
     id: "akari",
     name: "Akari",
@@ -130,6 +122,15 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     thumb: "👘",
   },
   {
+    id: "ren",
+    name: "Ren",
+    desc: "Karakter anime kasual santai dengan t-shirt (ekspresif & ramah)",
+    gender: "female",
+    url: "/models/avatar2.glb",
+    defaultVoiceGender: "female",
+    thumb: "👧",
+  },
+  {
     id: "robot",
     name: "Robo-Kun",
     desc: "Robot 3D futuristik ekspresif dengan 14 animasi emosi",
@@ -137,6 +138,16 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     url: "/models/robot.glb",
     defaultVoiceGender: "female",
     thumb: "🤖",
+  },
+  {
+    id: "mitsuri",
+    name: "Mitsuri (Patisserie)",
+    desc: "Koki patisserie ceria dengan pose dinamis, baret, lolipop cinta & kucing terbang",
+    gender: "female",
+    url: "/models/mitsuri.glb",
+    defaultVoiceGender: "female",
+    thumb: "🍰",
+    image: "/avatars/mitsuri.jpg",
   },
   {
     id: "custom",
@@ -201,22 +212,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
     brightness: 100,
   },
   companion: {
-    name: "Ren",
+    name: "Akari",
     persona: "romantic",
     customPrompt: "",
     modelProvider: "google",
   },
   voice: {
     gender: "female",
-    pitch: 1.12,
+    pitch: 1.15,
     rate: 1.0,
     volume: 1.0,
     autoPlay: true,
     voiceURI: "",
   },
   avatar: {
-    modelId: "ren",
-    modelUrl: "/models/avatar2.glb",
+    modelId: "akari",
+    modelUrl: "/models/avatar.glb",
     customModelUrl: "",
     breathingSpeed: 1.0,
     swayIntensity: 1.0,
@@ -272,11 +283,28 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.avatar?.modelId === "hina") {
-          parsed.avatar.modelId = "ren";
-        }
-        if (parsed.companion?.name === "Hina") {
-          parsed.companion.name = "Ren";
+        // Migrate previous defaults or missing models to Akari (the primary model)
+        if (
+          parsed.avatar?.modelId === "hina" ||
+          parsed.avatar?.modelId === "ren" ||
+          (parsed.avatar?.modelId === "mitsuri" && !parsed.avatar?.customModelUrl)
+        ) {
+          parsed.avatar = {
+            ...parsed.avatar,
+            modelId: "akari",
+            modelUrl: "/models/avatar.glb",
+          };
+          if (
+            parsed.companion?.name === "Hina" ||
+            parsed.companion?.name === "Ren" ||
+            parsed.companion?.name === "Mitsuri"
+          ) {
+            parsed.companion.name = "Akari";
+          }
+          if (parsed.voice) {
+            parsed.voice.pitch = 1.15;
+            parsed.voice.gender = "female";
+          }
         }
         setSettings({
           ...DEFAULT_SETTINGS,
@@ -416,7 +444,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           (p) =>
             p.id === settings.avatar.modelId ||
             (p.id === "ren" && settings.avatar.modelId === "hina")
-        )?.url || "/models/avatar2.glb";
+        )?.url || "/models/avatar.glb";
 
   return (
     <SettingsContext.Provider

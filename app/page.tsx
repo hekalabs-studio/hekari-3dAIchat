@@ -258,7 +258,7 @@ function MainAppView() {
       {!isChatOpen && latestAssistantMessage && (
         <FloatingDialogue
           message={latestAssistantMessage}
-          companionName={settings.companion?.name || "Ren"}
+          companionName={settings.companion?.name || "Akari"}
           isSpeaking={isSpeaking}
           onReplayVoice={handleAiResponse}
           onOpenChatDrawer={() => setIsChatOpen(true)}

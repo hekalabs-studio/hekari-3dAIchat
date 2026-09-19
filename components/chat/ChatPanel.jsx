@@ -196,10 +196,10 @@ const ChatPanel = forwardRef(function ChatPanel(
         {
           body: {
             modelProvider: selectedProvider,
-            companionName: settings.companion?.name || "Ren",
+            companionName: settings.companion?.name || "Akari",
             userName: settings.userProfile?.name || "heka",
             persona: settings.companion?.persona || "romantic",
-            modelId: settings.avatar?.modelId || "ren",
+            modelId: settings.avatar?.modelId || "akari",
             customInstructions: settings.companion?.customPrompt || "",
           },
         }
@@ -256,7 +256,7 @@ const ChatPanel = forwardRef(function ChatPanel(
   const currentProvider =
     AI_PROVIDERS.find((p) => p.key === selectedProvider) || AI_PROVIDERS[0];
 
-  const companionName = settings.companion?.name || "Aiko";
+  const companionName = settings.companion?.name || "Akari";
   const userName = settings.userProfile?.name || "User";
 
   return (

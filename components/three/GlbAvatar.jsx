@@ -69,7 +69,7 @@ const EMOTION_MORPH_MAP = {
  * in response to AI emotions, drives lip-sync visemes, and plays robot clips.
  */
 export default function GlbAvatar({
-  url = "/models/avatar2.glb",
+  url = "/models/avatar.glb",
   onModelLoaded,
   isSpeaking = false,
   currentEmotion = "neutral",
@@ -177,8 +177,8 @@ export default function GlbAvatar({
 
     // Use SkeletonUtils.clone to properly clone SkinnedMesh and re-bind bone influences for humanoids.
     // For robot.glb, SkeletonUtils.clone causes HandL/HandR inverse bind matrix distortion (ballooning bounding box to 149m).
-    // Using scene.clone(true) for robot preserves clean 4.79m dimensions and animations.
-    const cloned = url.includes("robot") ? scene.clone(true) : SkeletonUtils.clone(scene);
+    // Using scene.clone(true) for robot and static meshes preserves clean dimensions.
+    const cloned = (url.includes("robot") || url.includes("mitsuri")) ? scene.clone(true) : SkeletonUtils.clone(scene);
     const morphMeshes = [];
 
     // Reset bones reference
