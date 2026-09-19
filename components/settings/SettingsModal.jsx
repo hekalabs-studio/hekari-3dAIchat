@@ -114,9 +114,9 @@ export default function SettingsModal() {
           </div>
 
           <button
+            data-close-settings="true"
             onClick={closeSettings}
-            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white/60 hover:text-white flex items-center justify-center transition-colors"
-            aria-label="Tutup"
+            className="w-8 h-8 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
           >
             ✕
           </button>
@@ -457,10 +457,11 @@ export default function SettingsModal() {
                   {AVATAR_PRESETS.map((preset) => {
                     const isSelected =
                       settings.avatar.modelId === preset.id ||
-                      (preset.id === "hina" && settings.avatar.modelId === "ren");
+                      (preset.id === "ren" && settings.avatar.modelId === "hina");
                     return (
                       <div
                         key={preset.id}
+                        data-avatar-preset={preset.id}
                         onClick={() => {
                           updateAvatar({
                             modelId: preset.id,
@@ -713,6 +714,7 @@ export default function SettingsModal() {
             Pengaturan tersimpan otomatis ke peramban (localStorage)
           </p>
           <button
+            data-close-settings="true"
             onClick={closeSettings}
             className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-lg shadow-indigo-600/30"
           >

@@ -127,6 +127,7 @@ export default function AvatarCanvas({
 
             {/* GLB Avatar */}
             <GlbAvatar
+              key={modelUrl}
               url={modelUrl}
               onModelLoaded={handleModelLoaded}
               isSpeaking={isSpeaking}

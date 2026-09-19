@@ -27,6 +27,20 @@ const AI_PROVIDERS = [
     icon: "◆",
   },
   {
+    key: "groq",
+    label: "Groq (Ultra Fast)",
+    provider: "Groq",
+    color: "#f55036",
+    icon: "⚡",
+  },
+  {
+    key: "mistral",
+    label: "Mistral 7B",
+    provider: "Mistral",
+    color: "#ff7000",
+    icon: "▲",
+  },
+  {
     key: "anthropic",
     label: "Claude Sonnet 3.5",
     provider: "Anthropic",
@@ -35,17 +49,10 @@ const AI_PROVIDERS = [
   },
   {
     key: "xai",
-    label: "Grok 2",
-    provider: "xAI",
+    label: "Groq / xAI",
+    provider: "Groq",
     color: "#1da1f2",
     icon: "𝕏",
-  },
-  {
-    key: "mistral",
-    label: "Mistral Small",
-    provider: "Mistral",
-    color: "#ff7000",
-    icon: "▲",
   },
 ];
 
@@ -189,10 +196,10 @@ const ChatPanel = forwardRef(function ChatPanel(
         {
           body: {
             modelProvider: selectedProvider,
-            companionName: settings.companion?.name || "Hina",
+            companionName: settings.companion?.name || "Ren",
             userName: settings.userProfile?.name || "heka",
             persona: settings.companion?.persona || "romantic",
-            modelId: settings.avatar?.modelId || "hina",
+            modelId: settings.avatar?.modelId || "ren",
             customInstructions: settings.companion?.customPrompt || "",
           },
         }

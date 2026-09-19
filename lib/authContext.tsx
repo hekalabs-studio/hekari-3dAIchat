@@ -11,6 +11,7 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   ReactNode,
 } from "react";
@@ -86,22 +87,23 @@ function parseJwt(token: string): Record<string, string> | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { updateUserProfile, settings } = useAppSettings();
 
-  // Lazy initialize state from localStorage to avoid cascading render lint issues
-  const [user, setUser] = useState<GoogleUser | null>(() => {
-    if (typeof window === "undefined") return null;
+  // Initialize with null on both SSR and client to prevent hydration mismatch
+  const [user, setUser] = useState<GoogleUser | null>(null);
+
+  // Restore session from localStorage safely in useEffect after mount
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed: GoogleUser = JSON.parse(stored);
         if (parsed?.id && parsed?.email) {
-          return parsed;
+          setUser(parsed);
         }
       }
     } catch (e) {
       console.warn("[Auth] Failed to restore session", e);
     }
-    return null;
-  });
+  }, []);
 
   const [isLoading] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);

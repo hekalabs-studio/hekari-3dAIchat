@@ -46,28 +46,19 @@ const BLINK_R_NAMES = [
  */
 const EMOTION_MORPH_MAP = {
   joy: [
-    "Face_Blendshape.Fcl_ALL_Joy", "Fcl_ALL_Joy", "Face_Blendshape.Fcl_EYE_Joy", "Fcl_EYE_Joy",
-    "Face_Blendshape.Fcl_MTH_Joy", "Fcl_MTH_Joy", "Face_Blendshape.Fcl_BRW_Joy", "Fcl_BRW_Joy",
-    "mouthSmile", "Joy", "happy"
+    "Face_Blendshape.Fcl_ALL_Joy", "Fcl_ALL_Joy", "mouthSmile", "Joy", "happy"
   ],
   blush: [
-    "Face_Blendshape.Fcl_ALL_Fun", "Fcl_ALL_Fun", "Face_Blendshape.Fcl_BRW_Fun", "Fcl_BRW_Fun",
-    "Face_Blendshape.Fcl_EYE_Fun", "Fcl_EYE_Fun", "Face_Blendshape.Fcl_MTH_Fun", "Fcl_MTH_Fun"
+    "Face_Blendshape.Fcl_ALL_Fun", "Fcl_ALL_Fun"
   ],
   angry: [
-    "Face_Blendshape.Fcl_ALL_Angry", "Fcl_ALL_Angry", "Face_Blendshape.Fcl_BRW_Angry", "Fcl_BRW_Angry",
-    "Face_Blendshape.Fcl_EYE_Angry", "Fcl_EYE_Angry", "Face_Blendshape.Fcl_MTH_Angry", "Fcl_MTH_Angry",
-    "Angry"
+    "Face_Blendshape.Fcl_ALL_Angry", "Fcl_ALL_Angry", "Angry"
   ],
   sorrow: [
-    "Face_Blendshape.Fcl_ALL_Sorrow", "Fcl_ALL_Sorrow", "Face_Blendshape.Fcl_BRW_Sorrow", "Fcl_BRW_Sorrow",
-    "Face_Blendshape.Fcl_EYE_Sorrow", "Fcl_EYE_Sorrow", "Face_Blendshape.Fcl_MTH_Sorrow", "Fcl_MTH_Sorrow",
-    "Sad"
+    "Face_Blendshape.Fcl_ALL_Sorrow", "Fcl_ALL_Sorrow", "Sad"
   ],
   surprised: [
-    "Face_Blendshape.Fcl_ALL_Surprised", "Fcl_ALL_Surprised", "Face_Blendshape.Fcl_BRW_Surprised", "Fcl_BRW_Surprised",
-    "Face_Blendshape.Fcl_EYE_Surprised", "Fcl_EYE_Surprised", "Face_Blendshape.Fcl_MTH_Surprised", "Fcl_MTH_Surprised",
-    "Surprised"
+    "Face_Blendshape.Fcl_ALL_Surprised", "Fcl_ALL_Surprised", "Surprised"
   ],
 };
 
@@ -125,9 +116,14 @@ export default function GlbAvatar({
   useEffect(() => {
     const targets = { joy: 0, blush: 0, angry: 0, sorrow: 0, surprised: 0 };
     if (currentEmotion && currentEmotion in targets) {
-      targets[currentEmotion] = 0.85;
+      targets[currentEmotion] = 0.45; // Gentle, pleasing smile / expression
     }
     targetEmotionWeightsRef.current = targets;
+
+    // Smoothly decay back to natural neutral expression after 3.8s
+    const decayTimer = setTimeout(() => {
+      targetEmotionWeightsRef.current = { joy: 0, blush: 0, angry: 0, sorrow: 0, surprised: 0 };
+    }, 3800);
 
     // Handle robot animations if model has animation clips (e.g. robot.glb)
     if (animations && animations.length > 0 && mixerRef.current) {
@@ -151,8 +147,21 @@ export default function GlbAvatar({
         }
         nextAction.reset().fadeIn(0.4).play();
         currentActionRef.current = nextAction;
+
+        if (targetClipName !== "idle") {
+          setTimeout(() => {
+            const idleAction = actions["idle"] || actions["standing"] || Object.values(actions)[0];
+            if (idleAction && currentActionRef.current !== idleAction) {
+              currentActionRef.current?.fadeOut(0.4);
+              idleAction.reset().fadeIn(0.4).play();
+              currentActionRef.current = idleAction;
+            }
+          }, 3500);
+        }
       }
     }
+
+    return () => clearTimeout(decayTimer);
   }, [currentEmotion, animations]);
 
   // Public method to update viseme weights from TTS engine
@@ -166,14 +175,18 @@ export default function GlbAvatar({
   useEffect(() => {
     if (!scene) return;
 
-    // Use SkeletonUtils.clone to properly clone SkinnedMesh and re-bind bone influences!
-    const cloned = SkeletonUtils.clone(scene);
+    // Use SkeletonUtils.clone to properly clone SkinnedMesh and re-bind bone influences for humanoids.
+    // For robot.glb, SkeletonUtils.clone causes HandL/HandR inverse bind matrix distortion (ballooning bounding box to 149m).
+    // Using scene.clone(true) for robot preserves clean 4.79m dimensions and animations.
+    const cloned = url.includes("robot") ? scene.clone(true) : SkeletonUtils.clone(scene);
     const morphMeshes = [];
 
     // Reset bones reference
     const foundBones = {
       leftUpperArm: null,
       rightUpperArm: null,
+      aimLeftTopsUpperArm: null,
+      aimRightTopsUpperArm: null,
       leftLowerArm: null,
       rightLowerArm: null,
       leftHand: null,
@@ -181,28 +194,20 @@ export default function GlbAvatar({
       spine: null,
       neck: null,
       head: null,
-      leftSleeveBones: [],
-      rightSleeveBones: [],
       isHumanoid: false,
       baseRotations: {},
     };
 
     cloned.traverse((object) => {
-      // ── Detect Humanoid Bones & Sleeve Bones ──
+      // ── Detect Humanoid Bones & Tops Aim Bones ──
       if (object.isBone) {
         const name = object.name;
         const nameLower = name.toLowerCase();
 
-        if (name.includes("L_TopsUpperArm") || name.includes("Aim_L_Tops") || name.includes("Sec_L_Tops")) {
-          foundBones.leftSleeveBones.push({
-            bone: object,
-            baseRot: object.rotation.clone(),
-          });
-        } else if (name.includes("R_TopsUpperArm") || name.includes("Aim_R_Tops") || name.includes("Sec_R_Tops")) {
-          foundBones.rightSleeveBones.push({
-            bone: object,
-            baseRot: object.rotation.clone(),
-          });
+        if (name === "J_Aim_L_TopsUpperArm" || name.includes("Aim_L_TopsUpperArm")) {
+          foundBones.aimLeftTopsUpperArm = object;
+        } else if (name === "J_Aim_R_TopsUpperArm" || name.includes("Aim_R_TopsUpperArm")) {
+          foundBones.aimRightTopsUpperArm = object;
         }
 
         if (name.includes("J_Bip_L_UpperArm") || (nameLower.includes("upperarm") && (nameLower.includes(".l") || nameLower.includes("_l") || nameLower.includes("left")))) {
@@ -249,10 +254,10 @@ export default function GlbAvatar({
 
         const emotionLookup = {};
         for (const [emotionKey, possibleNames] of Object.entries(EMOTION_MORPH_MAP)) {
-          emotionLookup[emotionKey] = [];
           for (const name of possibleNames) {
             if (name in object.morphTargetDictionary) {
-              emotionLookup[emotionKey].push(object.morphTargetDictionary[name]);
+              emotionLookup[emotionKey] = object.morphTargetDictionary[name];
+              break; // Pick the best compound morph for this emotion
             }
           }
         }
@@ -309,12 +314,13 @@ export default function GlbAvatar({
     box.getSize(size);
     box.getCenter(center);
 
-    // Target height ~ 1.6 meters
-    const targetHeight = 1.6;
+    // Target height: ~1.4 meters for robot, ~1.6 meters for humanoid avatars
+    const isRobot = url.includes("robot");
+    const targetHeight = isRobot ? 1.4 : 1.6;
     const currentHeight = size.y;
     let scaleFactor = 1;
 
-    if (currentHeight > 0.1 && Math.abs(currentHeight - targetHeight) > 0.05) {
+    if (currentHeight > 0.001 && Math.abs(currentHeight - targetHeight) > 0.01) {
       scaleFactor = targetHeight / currentHeight;
       cloned.scale.set(scaleFactor, scaleFactor, scaleFactor);
     }
@@ -323,8 +329,9 @@ export default function GlbAvatar({
     const scaledCenter = new THREE.Vector3();
     scaledBox.getCenter(scaledCenter);
     const bottomY = scaledBox.min.y;
+    const yOffset = isRobot ? 0.32 : 0;
 
-    cloned.position.set(-scaledCenter.x, -bottomY, -scaledCenter.z);
+    cloned.position.set(-scaledCenter.x, -bottomY + yOffset, -scaledCenter.z);
 
     // Expose TTS lip-sync interface
     cloned.userData.setVisemeWeights = setVisemeWeights;
@@ -368,7 +375,7 @@ export default function GlbAvatar({
         container.clear();
       }
     };
-  }, [scene, animations, onModelLoaded, setVisemeWeights]);
+  }, [scene, url, animations, onModelLoaded, setVisemeWeights]);
 
   // ── Per-frame update loop ──
   useFrame((_, delta) => {
@@ -431,44 +438,32 @@ export default function GlbAvatar({
         emoHeadTiltX = 0.07; // Downcast sad look
       }
 
-      // --- Left Arm & Sleeves (rotate down from T-pose to resting beside body) ---
+      // --- Left Arm (rotate down from T-pose to natural relaxed A-pose) ---
       if (leftUpperArm && baseRotations.leftUpperArm) {
-        // VRM upper arm points along +X: rotate down by -1.26 rad (~-72°)
-        leftUpperArm.rotation.z = baseRotations.leftUpperArm.z - 1.26 + (bSway * 0.015) + armGesture;
-        leftUpperArm.rotation.y = baseRotations.leftUpperArm.y + 0.12;
-        leftUpperArm.rotation.x = baseRotations.leftUpperArm.x + 0.05;
-      }
-      if (bones.leftSleeveBones) {
-        for (let i = 0; i < bones.leftSleeveBones.length; i++) {
-          const { bone, baseRot } = bones.leftSleeveBones[i];
-          bone.rotation.z = baseRot.z - 1.26 + (bSway * 0.015) + armGesture;
-          bone.rotation.y = baseRot.y + 0.12;
-          bone.rotation.x = baseRot.x + 0.05;
+        leftUpperArm.rotation.z = baseRotations.leftUpperArm.z - 0.52 + (bSway * 0.012) + armGesture;
+        leftUpperArm.rotation.y = baseRotations.leftUpperArm.y + 0.10;
+        leftUpperArm.rotation.x = baseRotations.leftUpperArm.x + 0.04;
+        if (bones.aimLeftTopsUpperArm) {
+          bones.aimLeftTopsUpperArm.rotation.copy(leftUpperArm.rotation);
         }
       }
 
-      // --- Right Arm & Sleeves (rotate down from T-pose to resting beside body) ---
+      // --- Right Arm (rotate down from T-pose to natural relaxed A-pose) ---
       if (rightUpperArm && baseRotations.rightUpperArm) {
-        // VRM upper arm points along -X: rotate down by +1.26 rad (~+72°)
-        rightUpperArm.rotation.z = baseRotations.rightUpperArm.z + 1.26 - (bSway * 0.015) - armGesture;
-        rightUpperArm.rotation.y = baseRotations.rightUpperArm.y - 0.12;
-        rightUpperArm.rotation.x = baseRotations.rightUpperArm.x + 0.05;
-      }
-      if (bones.rightSleeveBones) {
-        for (let i = 0; i < bones.rightSleeveBones.length; i++) {
-          const { bone, baseRot } = bones.rightSleeveBones[i];
-          bone.rotation.z = baseRot.z + 1.26 - (bSway * 0.015) - armGesture;
-          bone.rotation.y = baseRot.y - 0.12;
-          bone.rotation.x = baseRot.x + 0.05;
+        rightUpperArm.rotation.z = baseRotations.rightUpperArm.z + 0.52 - (bSway * 0.012) - armGesture;
+        rightUpperArm.rotation.y = baseRotations.rightUpperArm.y - 0.10;
+        rightUpperArm.rotation.x = baseRotations.rightUpperArm.x + 0.04;
+        if (bones.aimRightTopsUpperArm) {
+          bones.aimRightTopsUpperArm.rotation.copy(rightUpperArm.rotation);
         }
       }
 
       // --- Forearms / Elbows (slight natural forward bend) ---
       if (leftLowerArm && baseRotations.leftLowerArm) {
-        leftLowerArm.rotation.x = baseRotations.leftLowerArm.x + 0.22 + (armGesture * 0.5);
+        leftLowerArm.rotation.x = baseRotations.leftLowerArm.x + 0.15;
       }
       if (rightLowerArm && baseRotations.rightLowerArm) {
-        rightLowerArm.rotation.x = baseRotations.rightLowerArm.x + 0.22 + (armGesture * 0.5);
+        rightLowerArm.rotation.x = baseRotations.rightLowerArm.x + 0.15;
       }
 
       // --- Spine (breathing expansion and gentle posture) ---
@@ -524,10 +519,10 @@ export default function GlbAvatar({
 
         // 1. Emotion morphs
         if (emotionLookup) {
-          for (const [emoKey, indices] of Object.entries(emotionLookup)) {
+          for (const [emoKey, morphIdx] of Object.entries(emotionLookup)) {
             const weight = currentE[emoKey] || 0;
-            for (const idx of indices) {
-              mesh.morphTargetInfluences[idx] = weight;
+            if (morphIdx !== undefined && morphIdx !== null) {
+              mesh.morphTargetInfluences[morphIdx] = weight;
             }
           }
         }

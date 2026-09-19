@@ -112,9 +112,9 @@ export interface AvatarPreset {
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
-    id: "hina",
-    name: "Hina",
-    desc: "Gadis anime kasual modern dengan kaos santai (ekspresif & ceria)",
+    id: "ren",
+    name: "Ren",
+    desc: "Karakter anime kasual santai dengan t-shirt (ekspresif & ramah)",
     gender: "female",
     url: "/models/avatar2.glb",
     defaultVoiceGender: "female",
@@ -201,7 +201,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     brightness: 100,
   },
   companion: {
-    name: "Hina",
+    name: "Ren",
     persona: "romantic",
     customPrompt: "",
     modelProvider: "google",
@@ -215,7 +215,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     voiceURI: "",
   },
   avatar: {
-    modelId: "hina",
+    modelId: "ren",
     modelUrl: "/models/avatar2.glb",
     customModelUrl: "",
     breathingSpeed: 1.0,
@@ -272,6 +272,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (parsed.avatar?.modelId === "hina") {
+          parsed.avatar.modelId = "ren";
+        }
+        if (parsed.companion?.name === "Hina") {
+          parsed.companion.name = "Ren";
+        }
         setSettings({
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -409,7 +415,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       : AVATAR_PRESETS.find(
           (p) =>
             p.id === settings.avatar.modelId ||
-            (p.id === "hina" && settings.avatar.modelId === "ren")
+            (p.id === "ren" && settings.avatar.modelId === "hina")
         )?.url || "/models/avatar2.glb";
 
   return (

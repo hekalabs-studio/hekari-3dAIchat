@@ -6,7 +6,7 @@
 // Replicates the Oshikoi left navigation bar with
 // user profile, gems, menu items, and news banner.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppSettings } from "@/lib/settingsContext";
 import { useAuth } from "@/lib/authContext";
 
@@ -16,6 +16,11 @@ export default function Sidebar() {
   const { userProfile, ui } = settings;
   const [activeMenu, setActiveMenu] = useState("Ruang Saya");
   const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleMenuClick = (item) => {
     setActiveMenu(item.label);
@@ -137,8 +142,8 @@ export default function Sidebar() {
       {/* ── Top Header & User Profile ── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
         {/* User Card */}
-        {!isAuthenticated ? (
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/[0.06]">
+        {(!mounted || !isAuthenticated) ? (
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/[0.06]" suppressHydrationWarning>
             <button
               onClick={openAuthModal}
               className="flex-1 mr-2 px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-left flex items-center gap-2.5 transition-all group"
@@ -173,7 +178,7 @@ export default function Sidebar() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/[0.06]" suppressHydrationWarning>
             <div
               onClick={() => openSettings("profile")}
               className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0 mr-1"

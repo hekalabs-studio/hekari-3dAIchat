@@ -25,7 +25,7 @@ const PROVIDERS = {
       const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
       return key && key.length > 10;
     },
-    create: () => google("gemini-2.5-flash"),
+    create: () => google("gemini-3.6-flash"),
   },
   groq: {
     label: "Groq (Ultra Fast)",
@@ -37,7 +37,7 @@ const PROVIDERS = {
           : null);
       return key && key.length > 10;
     },
-    create: () => groq("openai/gpt-oss-20b"),
+    create: () => groq("qwen/qwen3.8-27b"),
   },
   mistral: {
     label: "Mistral 7B",
@@ -64,7 +64,7 @@ const PROVIDERS = {
     create: () => {
       const key = process.env.XAI_API_KEY || process.env.GROQ_API_KEY || "";
       if (key.startsWith("gsk_")) {
-        return groq("openai/gpt-oss-20b");
+        return groq("qwen/qwen3.8-27b");
       }
       return xai("grok-2-latest");
     },
