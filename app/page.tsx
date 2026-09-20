@@ -35,7 +35,7 @@ const AvatarCanvasComponent = AvatarCanvas as any;
  * Inner application view wrapped by SettingsProvider
  */
 function MainAppView() {
-  const { settings, currentBgUrl, currentModelUrl } = useAppSettings();
+  const { settings, currentBgUrl, currentModelUrl, updateAvatar, updateCompanion } = useAppSettings();
   const isMounted = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -160,6 +160,15 @@ function MainAppView() {
     setIsChatOpen((prev) => !prev);
   }, []);
 
+  const handleFallbackToDefault = useCallback(() => {
+    updateAvatar({
+      modelId: "akari",
+      modelUrl: "/models/avatar.glb",
+      customModelUrl: "",
+    });
+    updateCompanion({ name: "Akari" });
+  }, [updateAvatar, updateCompanion]);
+
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-[#050510] select-none">
       {/* ── 1. Scenic Anime Background Layer ── */}
@@ -242,6 +251,7 @@ function MainAppView() {
           <AvatarCanvasComponent
             modelUrl={currentModelUrl}
             onModelLoaded={handleModelLoaded}
+            onFallbackToDefault={handleFallbackToDefault}
             isSpeaking={isSpeaking}
             currentEmotion={currentEmotion}
           />

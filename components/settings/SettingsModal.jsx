@@ -19,6 +19,10 @@ import {
 } from "@/lib/settingsContext";
 import { useAuth } from "@/lib/authContext";
 import { getTTSEngine } from "@/lib/ttsEngine";
+import {
+  saveCustomModelToStorage,
+  clearCustomModelFromStorage,
+} from "@/lib/customModelStorage";
 
 export default function SettingsModal() {
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
@@ -38,6 +42,60 @@ export default function SettingsModal() {
   const activeTab = settingsModal.activeTab || "background";
   const [availableVoices, setAvailableVoices] = useState([]);
   const [testPlaying, setTestPlaying] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  // Handle custom model file selection from local PC
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadError("");
+
+    // Recommend max 120MB for smooth browser loading
+    if (file.size > 120 * 1024 * 1024) {
+      setUploadError("Ukuran file terlalu besar (maksimal 120MB untuk kenyamanan memori peramban).");
+      return;
+    }
+
+    setUploadLoading(true);
+    try {
+      const { blobUrl } = await saveCustomModelToStorage(file, file.name);
+      updateAvatar({
+        modelId: "custom",
+        customModelUrl: blobUrl,
+        customModelName: file.name,
+      });
+
+      // Synchronize character name if it was set to standard default
+      if (settings.companion?.name === "Akari" || settings.companion?.name === "Ren" || !settings.companion?.name) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+        const titleName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        updateCompanion({ name: titleName });
+      }
+    } catch (err) {
+      console.error("[SettingsModal] IndexedDB save error, using direct blob URL:", err);
+      const directBlobUrl = URL.createObjectURL(file);
+      updateAvatar({
+        modelId: "custom",
+        customModelUrl: directBlobUrl,
+        customModelName: file.name,
+      });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleRemoveCustomModel = async () => {
+    await clearCustomModelFromStorage();
+    updateAvatar({
+      modelId: "akari",
+      modelUrl: "/models/avatar.glb",
+      customModelUrl: "",
+      customModelName: "",
+    });
+    updateCompanion({ name: "Akari" });
+  };
 
   // Fetch speech synthesis voices
   useEffect(() => {
@@ -429,6 +487,69 @@ export default function SettingsModal() {
                 </div>
               </div>
 
+              {/* AI Model Provider Selection */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2.5 block">
+                  Model AI (Otak Utama Companion)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[
+                    {
+                      key: "groq",
+                      label: "Groq (Ultra Fast)",
+                      desc: "Respon super kilat < 1 detik (Default Utama)",
+                      icon: "⚡",
+                      color: "#f55036",
+                    },
+                    {
+                      key: "google",
+                      label: "Gemini 3.6 Flash",
+                      desc: "Pemahaman konteks luas oleh Google",
+                      icon: "◆",
+                      color: "#4285f4",
+                    },
+                    {
+                      key: "mistral",
+                      label: "Mistral 7B",
+                      desc: "Model open-source cerdas & ekspresif",
+                      icon: "▲",
+                      color: "#ff7000",
+                    },
+                    {
+                      key: "anthropic",
+                      label: "Claude Sonnet 3.5",
+                      desc: "Kecerdasan emosional tinggi oleh Anthropic",
+                      icon: "✦",
+                      color: "#d4a574",
+                    },
+                  ].map((prov) => {
+                    const isSelected = (settings.companion.modelProvider || "groq") === prov.key;
+                    return (
+                      <div
+                        key={prov.key}
+                        onClick={() => updateCompanion({ modelProvider: prov.key })}
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-[#00bcd4]/15 border-[#00bcd4] ring-1 ring-[#00bcd4]/30 shadow-lg shadow-[#00bcd4]/15"
+                            : "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        <p className="text-white text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span style={{ color: prov.color }}>{prov.icon}</span>
+                            <span>{prov.label}</span>
+                          </span>
+                          {isSelected && <span className="text-[#00bcd4] font-bold">✓ Aktif</span>}
+                        </p>
+                        <p className="text-white/40 text-[10px] mt-1 leading-snug">
+                          {prov.desc}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Custom Prompt */}
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-1.5 block">
@@ -516,35 +637,125 @@ export default function SettingsModal() {
 
               {/* Custom GLB URL / Upload (if custom chosen) */}
               {settings.avatar.modelId === "custom" && (
-                <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] space-y-2">
-                  <label className="text-[11px] font-semibold text-white/70 block">
-                    URL atau File Model 3D Kustom (.glb / .gltf / .vrm)
-                  </label>
-                  <div className="flex gap-2">
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-[#00bcd4]/30 space-y-3.5 shadow-lg shadow-black/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-semibold text-white block">
+                        File Model 3D Kustom Komputer
+                      </label>
+                      <p className="text-[11px] text-white/50 mt-0.5">
+                        Format didukung: <strong>.glb</strong> (disarankan) atau <strong>.vrm</strong>
+                      </p>
+                    </div>
+                    {settings.avatar.customModelName && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#00bcd4]/15 border border-[#00bcd4]/30 text-[10px] text-[#00bcd4] font-medium">
+                        Tersimpan Lokal
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Active file display card */}
+                  {settings.avatar.customModelName ? (
+                    <div className="p-3 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-[#00bcd4]/20 border border-[#00bcd4]/40 flex items-center justify-center text-sm flex-shrink-0">
+                          📦
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">
+                            {settings.avatar.customModelName}
+                          </p>
+                          <p className="text-[10px] text-emerald-400 font-medium">
+                            Aktif & tersimpan otomatis di IndexedDB
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <label className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium cursor-pointer transition-colors">
+                          <span>Ganti</span>
+                          <input
+                            type="file"
+                            accept=".glb,.gltf,.vrm"
+                            onChange={handleFileSelected}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRemoveCustomModel}
+                          className="px-2.5 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 text-[11px] font-medium transition-colors cursor-pointer"
+                          title="Hapus model dan kembali ke Akari"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label
+                        className={`w-full p-4 rounded-xl border border-dashed flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer ${
+                          uploadLoading
+                            ? "bg-white/[0.08] border-[#00bcd4] animate-pulse"
+                            : "bg-white/[0.02] border-white/20 hover:bg-white/[0.06] hover:border-[#00bcd4]"
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-[#00bcd4]/15 text-[#00bcd4] flex items-center justify-center text-lg">
+                          {uploadLoading ? "⏳" : "📁"}
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-white">
+                            {uploadLoading
+                              ? "Menyimpan ke memori browser..."
+                              : "Klik untuk Pilih File .glb / .vrm"}
+                          </p>
+                          <p className="text-[11px] text-white/40 mt-0.5">
+                            File akan otomatis disimpan di browser Anda (IndexedDB)
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".glb,.gltf,.vrm"
+                          onChange={handleFileSelected}
+                          disabled={uploadLoading}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <p className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg">
+                      {uploadError}
+                    </p>
+                  )}
+
+                  {/* Remote URL fallback option */}
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[10px] text-white/50 block">
+                      Atau masukkan URL online langsung (.glb):
+                    </label>
                     <input
                       type="text"
-                      value={settings.avatar.customModelUrl || ""}
-                      onChange={(e) =>
-                        updateAvatar({ customModelUrl: e.target.value })
+                      value={
+                        settings.avatar.customModelUrl?.startsWith("blob:")
+                          ? ""
+                          : settings.avatar.customModelUrl || ""
                       }
+                      onChange={(e) => {
+                        updateAvatar({
+                          modelId: "custom",
+                          customModelUrl: e.target.value,
+                          customModelName: e.target.value ? "Online GLB Model" : "",
+                        });
+                      }}
                       placeholder="https://example.com/character.glb"
-                      className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-[#00bcd4]"
+                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-[#00bcd4]"
                     />
-                    <label className="px-3 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5">
-                      <span>Pilih File</span>
-                      <input
-                        type="file"
-                        accept=".glb,.gltf"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const blobUrl = URL.createObjectURL(file);
-                            updateAvatar({ customModelUrl: blobUrl });
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </label>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[10px] text-white/50 leading-relaxed">
+                    💡 <strong>Tips Penting:</strong> Gunakan file <strong>.glb</strong> (Binary GLTF) yang sudah memuat tekstur secara mandiri, atau file <strong>.vrm</strong> dari VRoid Studio. File <code>.gltf</code> biasa yang terpisah dengan folder tekstur / <code>.bin</code> tidak dapat dimuat langsung via peramban.
                   </div>
                 </div>
               )}

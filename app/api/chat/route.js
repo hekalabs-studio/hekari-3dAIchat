@@ -76,10 +76,10 @@ const PROVIDERS = {
  * Falls back to Google if the key is unknown.
  */
 function getModel(providerKey) {
-  const provider = PROVIDERS[providerKey] || PROVIDERS.google;
+  const provider = PROVIDERS[providerKey] || PROVIDERS.groq;
   if (!PROVIDERS[providerKey]) {
     console.warn(
-      `[Chat API] Unknown provider "${providerKey}", falling back to Google.`
+      `[Chat API] Unknown provider "${providerKey}", falling back to Groq.`
     );
   }
 
@@ -97,7 +97,7 @@ export async function POST(req) {
     const body = await req.json();
     const {
       messages,
-      modelProvider = "google",
+      modelProvider = "groq",
       companionName,
       userName,
       persona,

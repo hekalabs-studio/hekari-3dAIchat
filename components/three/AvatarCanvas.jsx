@@ -23,23 +23,42 @@ class ModelErrorBoundary extends Component {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error, errorInfo) {
+    console.error("[AvatarCanvas] ModelErrorBoundary caught error:", error, errorInfo);
+  }
+
   render() {
     if (this.state.hasError) {
+      const isCustom =
+        this.props.modelUrl?.startsWith("blob:") ||
+        this.props.modelUrl?.startsWith("data:") ||
+        this.props.isCustom;
+
       return (
         <Html center>
-          <div className="bg-black/80 backdrop-blur-md border border-red-500/30 p-6 rounded-2xl flex flex-col items-center text-center min-w-[300px]">
-            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4 border border-red-500/30">
-              <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="bg-black/90 backdrop-blur-xl border border-red-500/40 p-6 rounded-3xl flex flex-col items-center text-center max-w-[340px] shadow-2xl shadow-black/80 z-30 pointer-events-auto">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/20 flex items-center justify-center mb-3.5 border border-red-500/30 text-red-400">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-white font-semibold mb-2">Model Not Found</h3>
-            <p className="text-white/60 text-sm mb-4 leading-relaxed">
-              Could not load the 3D model.<br/>
-              Please ensure you have placed a valid<br/>
-              <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">avatar.glb</code> file in the<br/>
-              <code className="text-white/80 bg-white/10 px-1.5 py-0.5 rounded">public/models/</code> folder.
+            <h3 className="text-white font-bold text-sm mb-1.5">
+              {isCustom ? "Model Kustom Tidak Dapat Dimuat" : "Model Tidak Ditemukan"}
+            </h3>
+            <p className="text-white/70 text-xs mb-4 leading-relaxed">
+              {isCustom
+                ? "File model 3D kustom tidak valid atau format tidak kompatibel. Pastikan Anda menggunakan file .glb mandiri yang lengkap."
+                : "Gagal memuat model 3D avatar. Silakan pulihkan pengaturan ke default."}
             </p>
+            {this.props.onReset && (
+              <button
+                type="button"
+                onClick={this.props.onReset}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00bcd4] to-indigo-600 hover:from-[#00bcd4]/90 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-[#00bcd4]/25 transition-all cursor-pointer active:scale-95"
+              >
+                Kembali ke Model Akari
+              </button>
+            )}
           </div>
         </Html>
       );
@@ -50,20 +69,18 @@ class ModelErrorBoundary extends Component {
 
 /**
  * Loading fallback shown while the GLB model loads.
- * Renders a floating, pulsing sphere.
+ * Renders a subtle glowing indicator with helper text.
  */
 function LoadingFallback() {
   return (
-    <mesh>
-      <sphereGeometry args={[0.3, 32, 32]} />
-      <meshStandardMaterial
-        color="#6366f1"
-        emissive="#6366f1"
-        emissiveIntensity={0.5}
-        transparent
-        opacity={0.6}
-      />
-    </mesh>
+    <Html center>
+      <div className="flex flex-col items-center gap-2.5 bg-black/60 backdrop-blur-md px-5 py-3.5 rounded-2xl border border-white/10 shadow-2xl text-center pointer-events-none">
+        <div className="w-6 h-6 border-2 border-[#00bcd4] border-t-transparent rounded-full animate-spin" />
+        <span className="text-white/80 text-xs font-medium tracking-wide">
+          Memuat model 3D...
+        </span>
+      </div>
+    </Html>
   );
 }
 
@@ -79,6 +96,7 @@ function LoadingFallback() {
  * @param {Object} props
  * @param {string} [props.modelUrl] - GLB model path or URL
  * @param {(scene: any) => void} [props.onModelLoaded] - Called when GLB loads
+ * @param {() => void} [props.onFallbackToDefault] - Called to revert model on error
  * @param {boolean} [props.isSpeaking] - Whether avatar is currently speaking
  * @param {string} [props.currentEmotion] - Current facial emotion
  * @param {string} [props.className] - CSS class for the container
@@ -86,6 +104,7 @@ function LoadingFallback() {
 export default function AvatarCanvas({
   modelUrl = "/models/avatar.glb",
   onModelLoaded,
+  onFallbackToDefault,
   isSpeaking = false,
   currentEmotion = "neutral",
   className = "",
@@ -120,7 +139,11 @@ export default function AvatarCanvas({
         }}
         style={{ background: "transparent" }}
       >
-        <ModelErrorBoundary>
+        <ModelErrorBoundary
+          key={modelUrl}
+          modelUrl={modelUrl}
+          onReset={onFallbackToDefault}
+        >
           <Suspense fallback={<LoadingFallback />}>
             {/* Lighting Rig */}
             <AvatarLighting />

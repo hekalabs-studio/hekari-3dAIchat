@@ -20,18 +20,18 @@ import { useAuth } from "@/lib/authContext";
  */
 const AI_PROVIDERS = [
   {
-    key: "google",
-    label: "Gemini 3.6 Flash",
-    provider: "Google",
-    color: "#4285f4",
-    icon: "◆",
-  },
-  {
     key: "groq",
     label: "Groq (Ultra Fast)",
     provider: "Groq",
     color: "#f55036",
     icon: "⚡",
+  },
+  {
+    key: "google",
+    label: "Gemini 3.6 Flash",
+    provider: "Google",
+    color: "#4285f4",
+    icon: "◆",
   },
   {
     key: "mistral",
@@ -93,7 +93,7 @@ const ChatPanel = forwardRef(function ChatPanel(
   const { settings, updateCompanion, openSettings, toggleFocusMode } = useAppSettings();
   const { isAuthenticated, openAuthModal } = useAuth();
 
-  const selectedProvider = settings.companion?.modelProvider || "google";
+  const selectedProvider = settings.companion?.modelProvider || "groq";
   const [input, setInput] = useState("");
   const [prevExternalInput, setPrevExternalInput] = useState(externalInput);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);

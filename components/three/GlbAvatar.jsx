@@ -175,10 +175,21 @@ export default function GlbAvatar({
   useEffect(() => {
     if (!scene) return;
 
-    // Use SkeletonUtils.clone to properly clone SkinnedMesh and re-bind bone influences for humanoids.
-    // For robot.glb, SkeletonUtils.clone causes HandL/HandR inverse bind matrix distortion (ballooning bounding box to 149m).
-    // Using scene.clone(true) for robot and static meshes preserves clean dimensions.
-    const cloned = (url.includes("robot") || url.includes("mitsuri")) ? scene.clone(true) : SkeletonUtils.clone(scene);
+    // Use SkeletonUtils.clone ONLY for built-in VRoid models that require procedural un-T-pose arm manipulation.
+    // For all other models (custom uploads, robot, mitsuri, static or animated models), scene.clone(true) is safe,
+    // robust, and preserves clean dimensions without bone inversion distortion.
+    let cloned;
+    try {
+      const isBuiltinVroid = url.includes("avatar.glb") || url.includes("avatar2.glb");
+      if (isBuiltinVroid) {
+        cloned = SkeletonUtils.clone(scene);
+      } else {
+        cloned = scene.clone(true);
+      }
+    } catch (cloneErr) {
+      console.warn("[GlbAvatar] SkeletonUtils clone failed, falling back to scene.clone", cloneErr);
+      cloned = scene.clone(true);
+    }
     const morphMeshes = [];
 
     // Reset bones reference
@@ -320,9 +331,12 @@ export default function GlbAvatar({
     const currentHeight = size.y;
     let scaleFactor = 1;
 
-    if (currentHeight > 0.001 && Math.abs(currentHeight - targetHeight) > 0.01) {
+    if (currentHeight > 0.001 && Number.isFinite(currentHeight) && Math.abs(currentHeight - targetHeight) > 0.01) {
       scaleFactor = targetHeight / currentHeight;
-      cloned.scale.set(scaleFactor, scaleFactor, scaleFactor);
+      // Clamp scaleFactor to reasonable range to avoid microscopic or astronomical sizes
+      if (scaleFactor > 0.0001 && scaleFactor < 500) {
+        cloned.scale.set(scaleFactor, scaleFactor, scaleFactor);
+      }
     }
 
     const scaledBox = new THREE.Box3().setFromObject(cloned);
@@ -438,8 +452,9 @@ export default function GlbAvatar({
         emoHeadTiltX = 0.07; // Downcast sad look
       }
 
-      // --- Left Arm (rotate down from T-pose to natural relaxed A-pose) ---
-      if (leftUpperArm && baseRotations.leftUpperArm) {
+      // --- Left Arm (rotate down from T-pose to natural relaxed A-pose only for built-in VRoid models) ---
+      const isBuiltinVroid = url.includes("avatar.glb") || url.includes("avatar2.glb");
+      if (isBuiltinVroid && leftUpperArm && baseRotations.leftUpperArm) {
         leftUpperArm.rotation.z = baseRotations.leftUpperArm.z - 0.52 + (bSway * 0.012) + armGesture;
         leftUpperArm.rotation.y = baseRotations.leftUpperArm.y + 0.10;
         leftUpperArm.rotation.x = baseRotations.leftUpperArm.x + 0.04;
@@ -448,8 +463,8 @@ export default function GlbAvatar({
         }
       }
 
-      // --- Right Arm (rotate down from T-pose to natural relaxed A-pose) ---
-      if (rightUpperArm && baseRotations.rightUpperArm) {
+      // --- Right Arm (rotate down from T-pose to natural relaxed A-pose only for built-in VRoid models) ---
+      if (isBuiltinVroid && rightUpperArm && baseRotations.rightUpperArm) {
         rightUpperArm.rotation.z = baseRotations.rightUpperArm.z + 0.52 - (bSway * 0.012) - armGesture;
         rightUpperArm.rotation.y = baseRotations.rightUpperArm.y - 0.10;
         rightUpperArm.rotation.x = baseRotations.rightUpperArm.x + 0.04;
@@ -459,10 +474,10 @@ export default function GlbAvatar({
       }
 
       // --- Forearms / Elbows (slight natural forward bend) ---
-      if (leftLowerArm && baseRotations.leftLowerArm) {
+      if (isBuiltinVroid && leftLowerArm && baseRotations.leftLowerArm) {
         leftLowerArm.rotation.x = baseRotations.leftLowerArm.x + 0.15;
       }
-      if (rightLowerArm && baseRotations.rightLowerArm) {
+      if (isBuiltinVroid && rightLowerArm && baseRotations.rightLowerArm) {
         rightLowerArm.rotation.x = baseRotations.rightLowerArm.x + 0.15;
       }
 

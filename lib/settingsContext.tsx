@@ -15,6 +15,10 @@ import {
   useRef,
   ReactNode,
 } from "react";
+import {
+  loadCustomModelFromStorage,
+  clearCustomModelFromStorage,
+} from "./customModelStorage";
 
 const STORAGE_KEY = "aiko_companion_settings_v1";
 
@@ -185,6 +189,7 @@ export interface AppSettings {
     modelId: string;
     modelUrl: string;
     customModelUrl: string;
+    customModelName?: string;
     breathingSpeed: number;
     swayIntensity: number;
     speakingGestures: boolean;
@@ -215,7 +220,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     name: "Akari",
     persona: "romantic",
     customPrompt: "",
-    modelProvider: "google",
+    modelProvider: "groq",
   },
   voice: {
     gender: "female",
@@ -229,6 +234,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     modelId: "akari",
     modelUrl: "/models/avatar.glb",
     customModelUrl: "",
+    customModelName: "",
     breathingSpeed: 1.0,
     swayIntensity: 1.0,
     speakingGestures: true,
@@ -279,6 +285,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // 1. Load from localStorage once after mount on client (prevents hydration mismatch)
   useEffect(() => {
+    let isCancelled = false;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -306,6 +313,47 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             parsed.voice.gender = "female";
           }
         }
+
+        // Migrate default AI provider to Groq (Ultra Fast)
+        if (!parsed.companion?.modelProvider || parsed.companion?.modelProvider === "google") {
+          if (!parsed.companion) parsed.companion = {};
+          parsed.companion.modelProvider = "groq";
+        }
+
+        // Check if custom model was selected - restore fresh Blob URL from IndexedDB
+        if (parsed.avatar?.modelId === "custom") {
+          loadCustomModelFromStorage().then((loaded) => {
+            if (isCancelled) return;
+            if (loaded) {
+              setSettings((prev) => ({
+                ...prev,
+                avatar: {
+                  ...prev.avatar,
+                  modelId: "custom",
+                  customModelUrl: loaded.blobUrl,
+                  customModelName: loaded.name,
+                },
+              }));
+            } else if (!parsed.avatar?.customModelUrl?.startsWith("http")) {
+              // No valid model in IndexedDB and not a valid remote HTTP URL - fallback safely to Akari
+              console.warn("[Settings] No custom model found in IndexedDB, falling back to Akari");
+              setSettings((prev) => ({
+                ...prev,
+                avatar: {
+                  ...prev.avatar,
+                  modelId: "akari",
+                  modelUrl: "/models/avatar.glb",
+                  customModelUrl: "",
+                },
+                companion: {
+                  ...prev.companion,
+                  name: prev.companion?.name === "Kustom" ? "Akari" : prev.companion?.name,
+                },
+              }));
+            }
+          });
+        }
+
         setSettings({
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -322,6 +370,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       isLoadedRef.current = true;
     }
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const [settingsModal, setSettingsModal] = useState({
@@ -330,10 +382,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   });
 
   // 2. Save to localStorage only when settings change after initial load
+  // Do NOT write transient blob: URLs to localStorage to avoid dead pointer errors on reload.
   useEffect(() => {
     if (!isLoadedRef.current) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      const sanitizedSettings = {
+        ...settings,
+        avatar: {
+          ...settings.avatar,
+          customModelUrl: settings.avatar.customModelUrl?.startsWith("blob:")
+            ? ""
+            : settings.avatar.customModelUrl,
+        },
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedSettings));
     } catch (e) {
       console.warn("[Settings] Could not save settings to storage", e);
     }
@@ -426,6 +488,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
     localStorage.removeItem(STORAGE_KEY);
+    clearCustomModelFromStorage();
   }, []);
 
   // Compute active background URL
